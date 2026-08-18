@@ -25,14 +25,11 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
 
-            - name: Setup KernelSU Next (Direct Source Integration)
+      - name: Setup KernelSU Next
         run: |
           cd kernel_source
+          # Menggunakan repo organisasi resmi KernelSU-Next
           git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next drivers/kernelsu
-          echo "obj-y += kernelsu/" >> drivers/Makefile
-          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
-          
-          # Sambungkan drivers/kernelsu ke Makefile dan Kconfig
           echo "obj-y += kernelsu/" >> drivers/Makefile
           echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
 
@@ -41,11 +38,11 @@ jobs:
           cd kernel_source
           DEFCONFIG_FILE="arch/arm64/configs/lavender_defconfig"
           if [ -f "$DEFCONFIG_FILE" ]; then
-            # Konfigurasi Wajib KernelSU Next (Manual Hooking)
+            # Konfigurasi KernelSU Next
             echo "CONFIG_KSU=y" >> $DEFCONFIG_FILE
             echo "CONFIG_KSU_TAMPER_SYS_CALLS=y" >> $DEFCONFIG_FILE
             
-            # Konfigurasi Wajib Dynamic Partitions (Android 16 / crDroid)
+            # Konfigurasi Dynamic Partitions (crDroid A16)
             echo "CONFIG_OVERLAY_FS=y" >> $DEFCONFIG_FILE
             echo "CONFIG_EROFS_FS=y" >> $DEFCONFIG_FILE
             echo "CONFIG_EROFS_FS_ZIP=y" >> $DEFCONFIG_FILE
@@ -71,7 +68,6 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
           
-          # Salin biner hasil kompilasi kernel
           if [ -f "kernel_source/out/arch/arm64/boot/Image.gz-dtb" ]; then
             cp kernel_source/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
           elif [ -f "kernel_source/out/arch/arm64/boot/Image.gz" ]; then
@@ -80,7 +76,7 @@ jobs:
           
           cd AnyKernel3
           
-          # Konfigurasi AnyKernel3 agar otomatis mendeteksi partisi Dynamic/Non-Dynamic lavender
+          # Konfigurasi AnyKernel3 untuk partisi auto-detect
           sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.1\/by-name\/boot;/block=auto;/' anykernel.sh
           sed -i 's/is_slot_device=1;/is_slot_device=0;/' anykernel.sh
           
