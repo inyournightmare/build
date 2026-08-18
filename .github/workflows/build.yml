@@ -1,4 +1,4 @@
-name: Build Southwest Kernel with KernelSU Next
+name: Build Southwest Kernel with KernelSU Next (Dynamic Support)
 
 on:
   workflow_dispatch:
@@ -14,13 +14,13 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev libncursesw5-dev libglib2.0-dev zip unzip git curl wget
-          
+
       - name: Clone Toolchain (AOSP Clang & GCC)
         run: |
           mkdir -p toolchain
           cd toolchain
           git clone --depth=1 https://gitlab.com/panchajanya1999/azure-clang.git clang
-          
+
       - name: Clone Kernel Source (Southwest)
         run: |
           git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
@@ -28,15 +28,22 @@ jobs:
       - name: Setup KernelSU Next
         run: |
           cd kernel_source
+          # Menggunakan skrip penyiapan resmi KernelSU Next versi Next/Main
           curl -LSs "https://raw.githubusercontent.com/rifs33/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
-      - name: Patch Defconfig for KernelSU
+      - name: Patch Defconfig for KernelSU & Dynamic Partition Support
         run: |
           cd kernel_source
           DEFCONFIG_FILE="arch/arm64/configs/lavender_defconfig"
           if [ -f "$DEFCONFIG_FILE" ]; then
+            # Konfigurasi Wajib KernelSU Next
             echo "CONFIG_KSU=y" >> $DEFCONFIG_FILE
             echo "CONFIG_KSU_TAMPER_SYS_CALLS=y" >> $DEFCONFIG_FILE
+            
+            # Konfigurasi Pendukung Dynamic Partitions & Overlayfs
+            echo "CONFIG_OVERLAY_FS=y" >> $DEFCONFIG_FILE
+            echo "CONFIG_EROFS_FS=y" >> $DEFCONFIG_FILE
+            echo "CONFIG_EROFS_FS_ZIP=y" >> $DEFCONFIG_FILE
           fi
 
       - name: Compile Kernel
@@ -54,20 +61,28 @@ jobs:
           make lavender_defconfig
           make -j$(nproc) O=out
 
-      - name: Package with AnyKernel3
+      - name: Package with AnyKernel3 (Dynamic Partition Unified)
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
-          cp kernel_source/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/ || cp kernel_source/out/arch/arm64/boot/Image.gz AnyKernel3/
+          
+          # Salin biner hasil kompilasi
+          if [ -f "kernel_source/out/arch/arm64/boot/Image.gz-dtb" ]; then
+            cp kernel_source/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
+          elif [ -f "kernel_source/out/arch/arm64/boot/Image.gz" ]; then
+            cp kernel_source/out/arch/arm64/boot/Image.gz AnyKernel3/
+          fi
+          
           cd AnyKernel3
           
-          sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.1\/by-name\/boot;/block=\/dev\/block\/bootdevice\/by-name\/boot;/' anykernel.sh
+          # Pengaturan AnyKernel3 agar mendukung Dynamic & Non-Dynamic Partitions secara otomatis
+          sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.1\/by-name\/boot;/block=auto;/' anykernel.sh
           sed -i 's/is_slot_device=1;/is_slot_device=0;/' anykernel.sh
           
-          zip -r9 Southwest-KSUN-Lavender.zip * -x .git README.md
+          zip -r9 Southwest-KSUN-Lavender-Dynamic.zip * -x .git README.md
 
       - name: Upload Flashable ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Southwest-KernelSU-Next-Lavender
-          path: AnyKernel3/Southwest-KSUN-Lavender.zip
+          name: Southwest-KernelSU-Next-Lavender-Dynamic
+          path: AnyKernel3/Southwest-KSUN-Lavender-Dynamic.zip
           
