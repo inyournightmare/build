@@ -25,11 +25,16 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
 
-      - name: Setup KernelSU Next
+            - name: Setup KernelSU Next (Manual Clone)
         run: |
           cd kernel_source
-          # Menggunakan skrip penyiapan resmi KernelSU Next versi Next/Main
-          curl -LSs "https://raw.githubusercontent.com/rifs33/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+          # Clone langsung repo KernelSU Next ke folder drivers
+          git clone --depth=1 https://github.com/rifs33/KernelSU-Next drivers/kernelsu
+          
+          # Tambahkan konfigurasi ke Makefile dan Kconfig
+          echo "obj-y += kernelsu/" >> drivers/Makefile
+          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
+
 
       - name: Patch Defconfig for KernelSU & Dynamic Partition Support
         run: |
