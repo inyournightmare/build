@@ -1,0 +1,73 @@
+name: Build Southwest Kernel with KernelSU Next
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Install Dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev libncursesw5-dev libglib2.0-dev zip unzip git curl wget
+          
+      - name: Clone Toolchain (AOSP Clang & GCC)
+        run: |
+          mkdir -p toolchain
+          cd toolchain
+          git clone --depth=1 https://gitlab.com/panchajanya1999/azure-clang.git clang
+          
+      - name: Clone Kernel Source (Southwest)
+        run: |
+          git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
+
+      - name: Setup KernelSU Next
+        run: |
+          cd kernel_source
+          curl -LSs "https://raw.githubusercontent.com/rifs33/KernelSU-Next/next/kernel/setup.sh" | bash -s next
+
+      - name: Patch Defconfig for KernelSU
+        run: |
+          cd kernel_source
+          DEFCONFIG_FILE="arch/arm64/configs/lavender_defconfig"
+          if [ -f "$DEFCONFIG_FILE" ]; then
+            echo "CONFIG_KSU=y" >> $DEFCONFIG_FILE
+            echo "CONFIG_KSU_TAMPER_SYS_CALLS=y" >> $DEFCONFIG_FILE
+          fi
+
+      - name: Compile Kernel
+        run: |
+          cd kernel_source
+          export PATH="$(pwd)/../toolchain/clang/bin:$PATH"
+          export ARCH=arm64
+          export SUBARCH=arm64
+          export CROSS_COMPILE=aarch64-linux-gnu-
+          export CROSS_COMPILE_ARM32=arm-linux-gnueabi-
+          export CC=clang
+          export CLANG_TRIPLE=aarch64-linux-gnu-
+
+          make mrproper
+          make lavender_defconfig
+          make -j$(nproc) O=out
+
+      - name: Package with AnyKernel3
+        run: |
+          git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
+          cp kernel_source/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/ || cp kernel_source/out/arch/arm64/boot/Image.gz AnyKernel3/
+          cd AnyKernel3
+          
+          sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.1\/by-name\/boot;/block=\/dev\/block\/bootdevice\/by-name\/boot;/' anykernel.sh
+          sed -i 's/is_slot_device=1;/is_slot_device=0;/' anykernel.sh
+          
+          zip -r9 Southwest-KSUN-Lavender.zip * -x .git README.md
+
+      - name: Upload Flashable ZIP Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Southwest-KernelSU-Next-Lavender
+          path: AnyKernel3/Southwest-KSUN-Lavender.zip
+          
