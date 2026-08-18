@@ -1,4 +1,4 @@
-name: Build Southwest Kernel with KernelSU Next (Dynamic Support)
+name: Build EAS Kernel with KernelSU Next (Dynamic Support)
 
 on:
   workflow_dispatch:
@@ -15,34 +15,33 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y build-essential bc bison flex libssl-dev libncurses5-dev libncursesw5-dev libglib2.0-dev zip unzip git curl wget
 
-      - name: Clone Toolchain (AOSP Clang & GCC)
+      - name: Clone Toolchain (Azure Clang)
         run: |
           mkdir -p toolchain
           cd toolchain
           git clone --depth=1 https://gitlab.com/panchajanya1999/azure-clang.git clang
 
-      - name: Clone Kernel Source (Southwest Lavender)
+      - name: Clone Kernel Source (Lavender EAS 4.19)
         run: |
-          git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
+          # Menggunakan repo kernel 4.19 EAS lavender yang aktif dan stabil
+          git clone --depth=1 https://github.com/PocoF1-Lavender-Builds/android_kernel_xiaomi_lavender -b 4.19 kernel_source || git clone --depth=1 https://github.com/PixelOS-Devices/kernel_xiaomi_lavender -b thirteen kernel_source
 
       - name: Setup KernelSU Next
         run: |
           cd kernel_source
-          # Menggunakan repo organisasi resmi KernelSU-Next
-          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next drivers/kernelsu
-          echo "obj-y += kernelsu/" >> drivers/Makefile
-          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
+          # Menggunakan skrip installer resmi KernelSU Next
+          curl -LSs "https://raw.githubusercontent.com/KernelSU-Next/KernelSU-Next/next/kernel/setup.sh" | bash -s next
 
-      - name: Patch Defconfig for KernelSU & Dynamic Partition Support
+      - name: Patch Defconfig for KernelSU & Dynamic Partitions
         run: |
           cd kernel_source
           DEFCONFIG_FILE="arch/arm64/configs/lavender_defconfig"
           if [ -f "$DEFCONFIG_FILE" ]; then
-            # Konfigurasi KernelSU Next
+            # Konfigurasi Root KernelSU Next
             echo "CONFIG_KSU=y" >> $DEFCONFIG_FILE
             echo "CONFIG_KSU_TAMPER_SYS_CALLS=y" >> $DEFCONFIG_FILE
             
-            # Konfigurasi Dynamic Partitions (crDroid A16)
+            # Konfigurasi Dynamic Partition & Android 16 Storage (EROFS/Overlay)
             echo "CONFIG_OVERLAY_FS=y" >> $DEFCONFIG_FILE
             echo "CONFIG_EROFS_FS=y" >> $DEFCONFIG_FILE
             echo "CONFIG_EROFS_FS_ZIP=y" >> $DEFCONFIG_FILE
@@ -68,6 +67,7 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/osm0sis/AnyKernel3.git AnyKernel3
           
+          # Salin biner hasil kompilasi
           if [ -f "kernel_source/out/arch/arm64/boot/Image.gz-dtb" ]; then
             cp kernel_source/out/arch/arm64/boot/Image.gz-dtb AnyKernel3/
           elif [ -f "kernel_source/out/arch/arm64/boot/Image.gz" ]; then
@@ -76,15 +76,15 @@ jobs:
           
           cd AnyKernel3
           
-          # Konfigurasi AnyKernel3 untuk partisi auto-detect
+          # Setting AnyKernel3 Auto Detect Partisi (Dynamic/Retrofit & Non-Dynamic)
           sed -i 's/block=\/dev\/block\/platform\/omap\/omap_hsmmc.1\/by-name\/boot;/block=auto;/' anykernel.sh
           sed -i 's/is_slot_device=1;/is_slot_device=0;/' anykernel.sh
           
-          zip -r9 Southwest-4.19-KSUN-Lavender-Dynamic.zip * -x .git README.md
+          zip -r9 EAS-4.19-KSUN-Lavender-Dynamic.zip * -x .git README.md
 
       - name: Upload Flashable ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Southwest-4.19-KSUN-Lavender-Dynamic
-          path: AnyKernel3/Southwest-4.19-KSUN-Lavender-Dynamic.zip
+          name: EAS-4.19-KSUN-Lavender-Dynamic
+          path: AnyKernel3/EAS-4.19-KSUN-Lavender-Dynamic.zip
           
