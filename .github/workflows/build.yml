@@ -25,11 +25,12 @@ jobs:
         run: |
           git clone --depth=1 https://github.com/pix106/android_kernel_xiaomi_southwest-4.19 -b main kernel_source
 
-      - name: Setup KernelSU Next (Direct Source Integration)
+            - name: Setup KernelSU Next (Direct Source Integration)
         run: |
           cd kernel_source
-          # Kloning source code KernelSU Next langsung ke folder drivers untuk menghindari error 404/network
-          git clone --depth=1 https://github.com/rifs33/KernelSU-Next drivers/kernelsu
+          git clone --depth=1 https://github.com/KernelSU-Next/KernelSU-Next drivers/kernelsu
+          echo "obj-y += kernelsu/" >> drivers/Makefile
+          echo 'source "drivers/kernelsu/Kconfig"' >> drivers/Kconfig
           
           # Sambungkan drivers/kernelsu ke Makefile dan Kconfig
           echo "obj-y += kernelsu/" >> drivers/Makefile
